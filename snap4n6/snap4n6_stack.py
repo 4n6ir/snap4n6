@@ -154,7 +154,8 @@ class Snap4N6Stack(Stack):
             timeout = Duration.seconds(900),
             architecture = _lambda.Architecture.ARM_64,
             environment = dict(
-                BUCKET_NAME = bucket.bucket_name
+                BUCKET_NAME = bucket.bucket_name,
+                IMAGE_FUNCTION = '/snap4n6/task/image'
             ),
             memory_size = 512,
             role = role
