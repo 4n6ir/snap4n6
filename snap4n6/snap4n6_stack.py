@@ -3,6 +3,7 @@ from aws_cdk import (
     RemovalPolicy,
     Stack,
     aws_ec2 as _ec2,
+    aws_efs as _efs,
     aws_iam as _iam,
     aws_lambda as _lambda,
     aws_logs as _logs,
@@ -269,3 +270,26 @@ class Snap4N6Stack(Stack):
             string_value = state.state_machine_arn,
             tier = _ssm.ParameterTier.STANDARD
         )
+
+### SNAPSHOT IMAGE ###
+
+        efs = _efs.FileSystem(
+            self, 'efs', 
+            vpc = vpc,
+            removal_policy = RemovalPolicy.DESTROY
+        )
+
+        access = efs.add_access_point(
+            'AccessPoint',
+            path = '/export/snapshot',
+            create_acl = _efs.Acl(
+                owner_uid = '1001',
+                owner_gid = '1001',
+                permissions = '750'
+            ),
+            posix_user = _efs.PosixUser(
+                uid = '1001',
+                gid = '1001'
+            )
+        )
+
