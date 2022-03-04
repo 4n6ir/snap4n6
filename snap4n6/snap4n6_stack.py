@@ -2,6 +2,7 @@ from aws_cdk import (
     Duration,
     RemovalPolicy,
     Stack,
+    aws_ec2 as _ec2,
     aws_iam as _iam,
     aws_lambda as _lambda,
     aws_logs as _logs,
@@ -44,6 +45,12 @@ class Snap4N6Stack(Stack):
             )
         )
 
+        role.add_managed_policy(
+            _iam.ManagedPolicy.from_aws_managed_policy_name(
+                'service-role/AWSLambdaVPCAccessExecutionRole'
+            )
+        )
+
         role.add_to_policy(
             _iam.PolicyStatement(
                 actions = [
@@ -57,6 +64,35 @@ class Snap4N6Stack(Stack):
             )
         )
 
+### ISOLATED VPC ###
+
+        vpc = _ec2.Vpc(
+            self, 'vpc',
+            cidr = '192.168.242.0/24',
+            max_azs = 1,
+            nat_gateways = 0,
+            enable_dns_hostnames = True,
+            enable_dns_support = True,
+            subnet_configuration = [
+                _ec2.SubnetConfiguration(
+                    subnet_type = _ec2.SubnetType.PRIVATE_ISOLATED,
+                    name = 'isolated',
+                    cidr_mask = 24
+                )
+            ],
+            gateway_endpoints = {
+                'S3': _ec2.GatewayVpcEndpointOptions(
+                    service = _ec2.GatewayVpcEndpointAwsService.S3
+                )
+            }
+        )
+        
+        ### NOT SUPPORTED ###
+        #vpc.add_interface_endpoint(
+        #    'ElasticBlockStorageEndpoint',
+        #    service = _ec2.InterfaceVpcEndpointAwsService.EBS
+        #)
+
 ### BUDGET ###
 
         budget = _lambda.Function(
@@ -67,7 +103,8 @@ class Snap4N6Stack(Stack):
             timeout = Duration.seconds(900),
             architecture = _lambda.Architecture.ARM_64,
             memory_size = 512,
-            role = role
+            role = role,
+            #vpc = vpc
         )
         
         budgetlogs = _logs.LogGroup(
@@ -158,7 +195,8 @@ class Snap4N6Stack(Stack):
                 IMAGE_FUNCTION = '/snap4n6/task/image'
             ),
             memory_size = 512,
-            role = role
+            role = role,
+            #vpc = vpc
         )
         
         imagerlogs = _logs.LogGroup(
