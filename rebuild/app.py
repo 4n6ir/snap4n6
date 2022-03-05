@@ -23,7 +23,19 @@ def lambdaHandler(event, context):
     )
 
     output = response['Contents'][0]['Key'].split('/')
-    print(output[2])
+    filevalue = output[2].split('_')
+
+    os.system('dd if=/dev/zero of=/tmp/'+event['SnapshotID']+'.dd bs=1 count=0 seek='+filevalue[3]+'G')
+
+    if event['FileSystemExt4'] == 'Yes':
+        os.system('echo y | /usr/sbin/mkfs.ext4 /tmp/'+event['SnapshotID']+'.dd')
+
+    s3_client.upload_file(
+        '/tmp/'+event['SnapshotID']+'.dd',
+        os.environ['BUCKET_NAME'],
+        'image/'+event['SnapshotID']+'/'+event['SnapshotID']+'.dd'
+    )
+
 
 
 

@@ -3,6 +3,6 @@
 ###################################
 FROM public.ecr.aws/lambda/python:latest
 RUN yum update -y
-RUN yum install coreutils e4fsprogs -y
+RUN yum install coreutils e2fsprogs -y
 COPY app.py ./
 CMD ["app.lambdaHandler"]

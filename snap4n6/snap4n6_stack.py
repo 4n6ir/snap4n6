@@ -91,7 +91,6 @@ class Snap4N6Stack(Stack):
             }
         )
         
-        ### NOT SUPPORTED ###
         #vpc.add_interface_endpoint(
         #    'ElasticBlockStorageEndpoint',
         #    service = _ec2.InterfaceVpcEndpointAwsService.EBS
@@ -313,7 +312,7 @@ class Snap4N6Stack(Stack):
             environment = dict(
                 BUCKET_NAME = bucket.bucket_name
             ),
-            memory_size = 512,
+            memory_size = 2048,
             role = role
         )
 
