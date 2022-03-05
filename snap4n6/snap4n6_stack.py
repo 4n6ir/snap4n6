@@ -57,6 +57,9 @@ class Snap4N6Stack(Stack):
                 actions = [
                     'ebs:ListSnapshotBlocks',
                     'ebs:GetSnapshotBlock',
+                    's3:GetBucketLocation',
+                    's3:GetObject',
+                    's3:ListBucket',
                     's3:PutObject',
                     'ssm:GetParameter',
                     'states:StartExecution'
@@ -271,7 +274,7 @@ class Snap4N6Stack(Stack):
             tier = _ssm.ParameterTier.STANDARD
         )
 
-### SNAPSHOT IMAGE ###
+### SNAPSHOT STORAGE ###
 
         efs = _efs.FileSystem(
             self, 'efs', 
@@ -293,3 +296,38 @@ class Snap4N6Stack(Stack):
             )
         )
 
+        efsssm = _ssm.StringParameter(
+            self, 'efsssm',
+            description = 'Snap4n6 EFS File System',
+            parameter_name = '/snap4n6/storage/efsid',
+            string_value = efs.file_system_id,
+            tier = _ssm.ParameterTier.STANDARD
+        )
+
+### REBUILD ###
+
+        rebuild = _lambda.DockerImageFunction(
+            self, 'rebuild',
+            code = _lambda.DockerImageCode.from_image_asset('rebuild'),
+            timeout = Duration.seconds(900),
+            environment = dict(
+                BUCKET_NAME = bucket.bucket_name
+            ),
+            memory_size = 512,
+            role = role
+        )
+
+        rebuildlogs = _logs.LogGroup(
+            self, 'rebuildlogs',
+            log_group_name = '/aws/lambda/'+rebuild.function_name,
+            retention = _logs.RetentionDays.ONE_DAY,
+            removal_policy = RemovalPolicy.DESTROY
+        )
+
+        rebuildmonitor = _ssm.StringParameter(
+            self, 'rebuildmonitor',
+            description = 'Snap4n6 Rebuild Monitor',
+            parameter_name = '/snap4n6/monitor/rebuild',
+            string_value = '/aws/lambda/'+rebuild.function_name,
+            tier = _ssm.ParameterTier.STANDARD,
+        )
