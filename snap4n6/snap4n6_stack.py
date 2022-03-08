@@ -48,6 +48,12 @@ class Snap4N6Stack(Stack):
 
         role.add_managed_policy(
             _iam.ManagedPolicy.from_aws_managed_policy_name(
+                'service-role/AWSLambdaRole'
+            )
+        )
+
+        role.add_managed_policy(
+            _iam.ManagedPolicy.from_aws_managed_policy_name(
                 'service-role/AWSLambdaVPCAccessExecutionRole'
             )
         )
@@ -303,6 +309,42 @@ class Snap4N6Stack(Stack):
             tier = _ssm.ParameterTier.STANDARD
         )
 
+### TRANSFER ###
+
+        transfer = _lambda.Function(
+            self, 'transfer',
+            runtime = _lambda.Runtime.PYTHON_3_9,
+            code = _lambda.Code.from_asset('transfer'),
+            handler = 'transfer.handler',
+            timeout = Duration.seconds(900),
+            role = role,
+            environment = dict(
+                BUCKET_NAME = bucket.bucket_name
+            ),
+            architecture = _lambda.Architecture.ARM_64,
+            filesystem = _lambda.FileSystem.from_efs_access_point(
+                access,
+                '/mnt/snapshot'
+            ),
+            memory_size = 512,
+            vpc = vpc
+        )
+        
+        transferlogs = _logs.LogGroup(
+            self, 'transferlogs',
+            log_group_name = '/aws/lambda/'+transfer.function_name,
+            retention = _logs.RetentionDays.ONE_DAY,
+            removal_policy = RemovalPolicy.DESTROY
+        )
+        
+        transfermonitor = _ssm.StringParameter(
+            self, 'transfermonitor',
+            description = 'Snap4n6 Transfer Monitor',
+            parameter_name = '/snap4n6/monitor/transfer',
+            string_value = '/aws/lambda/'+transfer.function_name,
+            tier = _ssm.ParameterTier.STANDARD,
+        )
+
 ### REBUILD ###
 
         rebuild = _lambda.DockerImageFunction(
@@ -310,7 +352,8 @@ class Snap4N6Stack(Stack):
             code = _lambda.DockerImageCode.from_image_asset('rebuild'),
             timeout = Duration.seconds(900),
             environment = dict(
-                BUCKET_NAME = bucket.bucket_name
+                BUCKET_NAME = bucket.bucket_name,
+                NEXT_LAMBDA = transfer.function_name
             ),
             memory_size = 2048,
             role = role
@@ -330,3 +373,4 @@ class Snap4N6Stack(Stack):
             string_value = '/aws/lambda/'+rebuild.function_name,
             tier = _ssm.ParameterTier.STANDARD,
         )
+

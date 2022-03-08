@@ -36,9 +36,13 @@ def lambdaHandler(event, context):
         'image/'+event['SnapshotID']+'/'+event['SnapshotID']+'.dd'
     )
 
-
-
-
+    lambda_client = boto3.client('lambda')
+    
+    lambda_client.invoke(
+        FunctionName = os.environ['NEXT_LAMBDA'],
+        InvocationType = 'Event',
+        Payload = json.dumps(event)
+    )
 
     return {
         'statusCode': 200,
