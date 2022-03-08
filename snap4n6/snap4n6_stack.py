@@ -319,14 +319,15 @@ class Snap4N6Stack(Stack):
             timeout = Duration.seconds(900),
             role = role,
             environment = dict(
-                BUCKET_NAME = bucket.bucket_name
+                BUCKET_NAME = bucket.bucket_name,
+                REBUILD_FUNCTION = '/snap4n6/task/rebuild'
             ),
             architecture = _lambda.Architecture.ARM_64,
             filesystem = _lambda.FileSystem.from_efs_access_point(
                 access,
                 '/mnt/snapshot'
             ),
-            memory_size = 512,
+            memory_size = 2048,
             vpc = vpc
         )
         
@@ -344,6 +345,10 @@ class Snap4N6Stack(Stack):
             string_value = '/aws/lambda/'+transfer.function_name,
             tier = _ssm.ParameterTier.STANDARD,
         )
+
+### UPLOAD ###
+
+
 
 ### REBUILD ###
 
@@ -374,3 +379,91 @@ class Snap4N6Stack(Stack):
             tier = _ssm.ParameterTier.STANDARD,
         )
 
+### REBUILDER ###
+
+        rebuilder = _lambda.Function(
+            self, 'rebuilder',
+            runtime = _lambda.Runtime.PYTHON_3_9,
+            code = _lambda.Code.from_asset('rebuilder'),
+            handler = 'rebuilder.handler',
+            timeout = Duration.seconds(900),
+            architecture = _lambda.Architecture.ARM_64,
+            environment = dict(
+                BUCKET_NAME = bucket.bucket_name,
+                REBUILD_FUNCTION = '/snap4n6/task/rebuild'
+            ),
+            memory_size = 512,
+            role = role,
+            vpc = vpc
+        )
+        
+        rebuilderlogs = _logs.LogGroup(
+            self, 'rebuilderlogs',
+            log_group_name = '/aws/lambda/'+rebuilder.function_name,
+            retention = _logs.RetentionDays.ONE_DAY,
+            removal_policy = RemovalPolicy.DESTROY
+        )
+        
+        rebuildermonitor = _ssm.StringParameter(
+            self, 'rebuildermonitor',
+            description = 'Snap4n6 Rebuilder Monitor',
+            parameter_name = '/snap4n6/monitor/rebuilder',
+            string_value = '/aws/lambda/'+rebuilder.function_name,
+            tier = _ssm.ParameterTier.STANDARD
+        )
+
+### REBUILD FUNCTION ###
+
+        build = _tasks.LambdaInvoke(
+            self, 'build',
+            lambda_function = passthru,
+            output_path = '$.Payload',
+        )
+
+        building = _tasks.LambdaInvoke(
+            self, 'building',
+            lambda_function = rebuilder,
+            output_path = '$.Payload',
+        )
+
+        failedbuild = _sfn.Fail(
+            self, 'failedbuild',
+            cause = 'Failed',
+            error = 'FAILED'
+        )
+
+        succeedbuild = _sfn.Succeed(
+            self, 'succeededbuild',
+            comment = 'SUCCEEDED'
+        )
+
+        definedbuild = build.next(building) \
+            .next(_sfn.Choice(self, 'BuildCompleted?')
+                .when(_sfn.Condition.string_equals('$.status', 'FAILED'), failedbuild)
+                .when(_sfn.Condition.string_equals('$.status', 'SUCCEEDED'), succeedbuild)
+                .otherwise(building)
+            )
+            
+        buildlogs = _logs.LogGroup(
+            self, 'buildlogs',
+            log_group_name = '/aws/state/snap4n6build',
+            retention = _logs.RetentionDays.ONE_DAY,
+            removal_policy = RemovalPolicy.DESTROY
+        )
+            
+        buildstate = _sfn.StateMachine(
+            self, 'snap4n6build',
+            definition = definedbuild,
+            logs = _sfn.LogOptions(
+                destination = buildlogs,
+                level = _sfn.LogLevel.ALL
+            )
+        )
+
+        buildssm = _ssm.StringParameter(
+            self, 'buildssm',
+            description = 'Snap4n6 Build State',
+            parameter_name = '/snap4n6/task/build',
+            string_value = buildstate.state_machine_arn,
+            tier = _ssm.ParameterTier.STANDARD
+        )

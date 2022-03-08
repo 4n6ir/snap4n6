@@ -8,6 +8,7 @@ import os
 #{                                           #
 #    "SnapshotID": "snap-0f3e60199f11889da", #
 #    "FileSystemExt4": "Yes",                #
+#    "State": "START",                       #
 #    "Transitions": 0                        #
 #}                                           #
 ##############################################
