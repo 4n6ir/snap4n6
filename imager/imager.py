@@ -1,4 +1,5 @@
 import boto3
+import gzip
 import hashlib
 import io
 import json
@@ -33,7 +34,14 @@ def handler(event, context):
     					f.write(b)
     			f.close()
     			fname = str(block['BlockIndex']).zfill(10)+'_'+snapid+'_'+sha256_hash.hexdigest()+'_'+str(response['VolumeSize'])+'_'+str(response['BlockSize'])
-    			s3_client.upload_file('/tmp/'+snapid+'.tmp', os.environ['BUCKET_NAME'], 'raw/'+snapid+'/'+fname)
+    			with io.FileIO('/tmp/'+snapid+'.tmp', 'rb') as r:
+    			    with gzip.open('/tmp/'+fname+'.gz','wb') as w:
+    			        for b in r:
+    			            w.write(b)
+    			    w.close()
+    			r.close()
+    			s3_client.upload_file('/tmp/'+fname+'.gz', os.environ['BUCKET_NAME'], snapid+'/'+fname+'.gz')
+    			os.system('rm /tmp/'+fname+'.gz')
     		try:
     			state = response['NextToken']
     			status = 'CONTINUE'
@@ -59,7 +67,14 @@ def handler(event, context):
     					f.write(b)
     			f.close()
     			fname = str(block['BlockIndex']).zfill(10)+'_'+snapid+'_'+sha256_hash.hexdigest()+'_'+str(response['VolumeSize'])+'_'+str(response['BlockSize'])
-    			s3_client.upload_file('/tmp/'+snapid+'.tmp', os.environ['BUCKET_NAME'], 'raw/'+snapid+'/'+fname)						
+    			with io.FileIO('/tmp/'+snapid+'.tmp', 'rb') as r:
+    			    with gzip.open('/tmp/'+fname+'.gz','wb') as w:
+    			        for b in r:
+    			            w.write(b)
+    			    w.close()
+    			r.close()
+    			s3_client.upload_file('/tmp/'+fname+'.gz', os.environ['BUCKET_NAME'], snapid+'/'+fname+'.gz')
+    			os.system('rm /tmp/'+fname+'.gz')
     		try:
     			state = response['NextToken']
     			status = 'CONTINUE'

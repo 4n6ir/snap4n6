@@ -2,8 +2,6 @@ from aws_cdk import (
     Duration,
     RemovalPolicy,
     Stack,
-    aws_ec2 as _ec2,
-    aws_efs as _efs,
     aws_iam as _iam,
     aws_lambda as _lambda,
     aws_logs as _logs,
@@ -31,6 +29,14 @@ class Snap4N6Stack(Stack):
             versioned = True
         )
 
+        bucketssm = _ssm.StringParameter(
+            self, 'bucketssm',
+            description = 'Snap4n6 S3 Bucket',
+            parameter_name = '/snap4n6/s3/bucket',
+            string_value = bucket.bucket_name,
+            tier = _ssm.ParameterTier.STANDARD
+        )
+
 ### ROLE ###
 
         role = _iam.Role(
@@ -46,26 +52,11 @@ class Snap4N6Stack(Stack):
             )
         )
 
-        role.add_managed_policy(
-            _iam.ManagedPolicy.from_aws_managed_policy_name(
-                'service-role/AWSLambdaRole'
-            )
-        )
-
-        role.add_managed_policy(
-            _iam.ManagedPolicy.from_aws_managed_policy_name(
-                'service-role/AWSLambdaVPCAccessExecutionRole'
-            )
-        )
-
         role.add_to_policy(
             _iam.PolicyStatement(
                 actions = [
                     'ebs:ListSnapshotBlocks',
                     'ebs:GetSnapshotBlock',
-                    's3:GetBucketLocation',
-                    's3:GetObject',
-                    's3:ListBucket',
                     's3:PutObject',
                     'ssm:GetParameter',
                     'states:StartExecution'
@@ -73,34 +64,6 @@ class Snap4N6Stack(Stack):
                 resources = ['*']
             )
         )
-
-### ISOLATED VPC ###
-
-        vpc = _ec2.Vpc(
-            self, 'vpc',
-            cidr = '192.168.242.0/24',
-            max_azs = 1,
-            nat_gateways = 0,
-            enable_dns_hostnames = True,
-            enable_dns_support = True,
-            subnet_configuration = [
-                _ec2.SubnetConfiguration(
-                    subnet_type = _ec2.SubnetType.PRIVATE_ISOLATED,
-                    name = 'isolated',
-                    cidr_mask = 24
-                )
-            ],
-            gateway_endpoints = {
-                'S3': _ec2.GatewayVpcEndpointOptions(
-                    service = _ec2.GatewayVpcEndpointAwsService.S3
-                )
-            }
-        )
-        
-        #vpc.add_interface_endpoint(
-        #    'ElasticBlockStorageEndpoint',
-        #    service = _ec2.InterfaceVpcEndpointAwsService.EBS
-        #)
 
 ### BUDGET ###
 
@@ -112,8 +75,7 @@ class Snap4N6Stack(Stack):
             timeout = Duration.seconds(900),
             architecture = _lambda.Architecture.ARM_64,
             memory_size = 512,
-            role = role,
-            #vpc = vpc
+            role = role
         )
         
         budgetlogs = _logs.LogGroup(
@@ -204,8 +166,7 @@ class Snap4N6Stack(Stack):
                 IMAGE_FUNCTION = '/snap4n6/task/image'
             ),
             memory_size = 512,
-            role = role,
-            #vpc = vpc
+            role = role
         )
         
         imagerlogs = _logs.LogGroup(
@@ -276,194 +237,5 @@ class Snap4N6Stack(Stack):
             description = 'Snap4n6 Image State',
             parameter_name = '/snap4n6/task/image',
             string_value = state.state_machine_arn,
-            tier = _ssm.ParameterTier.STANDARD
-        )
-
-### SNAPSHOT STORAGE ###
-
-        efs = _efs.FileSystem(
-            self, 'efs', 
-            vpc = vpc,
-            removal_policy = RemovalPolicy.DESTROY
-        )
-
-        access = efs.add_access_point(
-            'AccessPoint',
-            path = '/export/snapshot',
-            create_acl = _efs.Acl(
-                owner_uid = '1001',
-                owner_gid = '1001',
-                permissions = '750'
-            ),
-            posix_user = _efs.PosixUser(
-                uid = '1001',
-                gid = '1001'
-            )
-        )
-
-        efsssm = _ssm.StringParameter(
-            self, 'efsssm',
-            description = 'Snap4n6 EFS File System',
-            parameter_name = '/snap4n6/storage/efsid',
-            string_value = efs.file_system_id,
-            tier = _ssm.ParameterTier.STANDARD
-        )
-
-### TRANSFER ###
-
-        transfer = _lambda.Function(
-            self, 'transfer',
-            runtime = _lambda.Runtime.PYTHON_3_9,
-            code = _lambda.Code.from_asset('transfer'),
-            handler = 'transfer.handler',
-            timeout = Duration.seconds(900),
-            role = role,
-            environment = dict(
-                BUCKET_NAME = bucket.bucket_name,
-                REBUILD_FUNCTION = '/snap4n6/task/rebuild'
-            ),
-            architecture = _lambda.Architecture.ARM_64,
-            filesystem = _lambda.FileSystem.from_efs_access_point(
-                access,
-                '/mnt/snapshot'
-            ),
-            memory_size = 2048,
-            vpc = vpc
-        )
-        
-        transferlogs = _logs.LogGroup(
-            self, 'transferlogs',
-            log_group_name = '/aws/lambda/'+transfer.function_name,
-            retention = _logs.RetentionDays.ONE_DAY,
-            removal_policy = RemovalPolicy.DESTROY
-        )
-        
-        transfermonitor = _ssm.StringParameter(
-            self, 'transfermonitor',
-            description = 'Snap4n6 Transfer Monitor',
-            parameter_name = '/snap4n6/monitor/transfer',
-            string_value = '/aws/lambda/'+transfer.function_name,
-            tier = _ssm.ParameterTier.STANDARD,
-        )
-
-### UPLOAD ###
-
-
-
-### REBUILD ###
-
-        rebuild = _lambda.DockerImageFunction(
-            self, 'rebuild',
-            code = _lambda.DockerImageCode.from_image_asset('rebuild'),
-            timeout = Duration.seconds(900),
-            environment = dict(
-                BUCKET_NAME = bucket.bucket_name,
-                NEXT_LAMBDA = transfer.function_name
-            ),
-            memory_size = 2048,
-            role = role
-        )
-
-        rebuildlogs = _logs.LogGroup(
-            self, 'rebuildlogs',
-            log_group_name = '/aws/lambda/'+rebuild.function_name,
-            retention = _logs.RetentionDays.ONE_DAY,
-            removal_policy = RemovalPolicy.DESTROY
-        )
-
-        rebuildmonitor = _ssm.StringParameter(
-            self, 'rebuildmonitor',
-            description = 'Snap4n6 Rebuild Monitor',
-            parameter_name = '/snap4n6/monitor/rebuild',
-            string_value = '/aws/lambda/'+rebuild.function_name,
-            tier = _ssm.ParameterTier.STANDARD,
-        )
-
-### REBUILDER ###
-
-        rebuilder = _lambda.Function(
-            self, 'rebuilder',
-            runtime = _lambda.Runtime.PYTHON_3_9,
-            code = _lambda.Code.from_asset('rebuilder'),
-            handler = 'rebuilder.handler',
-            timeout = Duration.seconds(900),
-            architecture = _lambda.Architecture.ARM_64,
-            environment = dict(
-                BUCKET_NAME = bucket.bucket_name,
-                REBUILD_FUNCTION = '/snap4n6/task/rebuild'
-            ),
-            memory_size = 512,
-            role = role,
-            vpc = vpc
-        )
-        
-        rebuilderlogs = _logs.LogGroup(
-            self, 'rebuilderlogs',
-            log_group_name = '/aws/lambda/'+rebuilder.function_name,
-            retention = _logs.RetentionDays.ONE_DAY,
-            removal_policy = RemovalPolicy.DESTROY
-        )
-        
-        rebuildermonitor = _ssm.StringParameter(
-            self, 'rebuildermonitor',
-            description = 'Snap4n6 Rebuilder Monitor',
-            parameter_name = '/snap4n6/monitor/rebuilder',
-            string_value = '/aws/lambda/'+rebuilder.function_name,
-            tier = _ssm.ParameterTier.STANDARD
-        )
-
-### REBUILD FUNCTION ###
-
-        build = _tasks.LambdaInvoke(
-            self, 'build',
-            lambda_function = passthru,
-            output_path = '$.Payload',
-        )
-
-        building = _tasks.LambdaInvoke(
-            self, 'building',
-            lambda_function = rebuilder,
-            output_path = '$.Payload',
-        )
-
-        failedbuild = _sfn.Fail(
-            self, 'failedbuild',
-            cause = 'Failed',
-            error = 'FAILED'
-        )
-
-        succeedbuild = _sfn.Succeed(
-            self, 'succeededbuild',
-            comment = 'SUCCEEDED'
-        )
-
-        definedbuild = build.next(building) \
-            .next(_sfn.Choice(self, 'BuildCompleted?')
-                .when(_sfn.Condition.string_equals('$.status', 'FAILED'), failedbuild)
-                .when(_sfn.Condition.string_equals('$.status', 'SUCCEEDED'), succeedbuild)
-                .otherwise(building)
-            )
-            
-        buildlogs = _logs.LogGroup(
-            self, 'buildlogs',
-            log_group_name = '/aws/state/snap4n6build',
-            retention = _logs.RetentionDays.ONE_DAY,
-            removal_policy = RemovalPolicy.DESTROY
-        )
-            
-        buildstate = _sfn.StateMachine(
-            self, 'snap4n6build',
-            definition = definedbuild,
-            logs = _sfn.LogOptions(
-                destination = buildlogs,
-                level = _sfn.LogLevel.ALL
-            )
-        )
-
-        buildssm = _ssm.StringParameter(
-            self, 'buildssm',
-            description = 'Snap4n6 Build State',
-            parameter_name = '/snap4n6/task/build',
-            string_value = buildstate.state_machine_arn,
             tier = _ssm.ParameterTier.STANDARD
         )
