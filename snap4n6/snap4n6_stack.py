@@ -74,7 +74,7 @@ class Snap4N6Stack(Stack):
             handler = 'budget.handler',
             timeout = Duration.seconds(900),
             architecture = _lambda.Architecture.ARM_64,
-            memory_size = 512,
+            memory_size = 128,
             role = role
         )
         
@@ -100,9 +100,9 @@ class Snap4N6Stack(Stack):
             runtime = _lambda.Runtime.PYTHON_3_9,
             code = _lambda.Code.from_asset('passthru'),
             handler = 'passthru.handler',
-            timeout = Duration.seconds(900),
+            timeout = Duration.seconds(30),
             architecture = _lambda.Architecture.ARM_64,
-            memory_size = 512,
+            memory_size = 128,
             role = role
         )
         
@@ -128,12 +128,12 @@ class Snap4N6Stack(Stack):
             runtime = _lambda.Runtime.PYTHON_3_9,
             code = _lambda.Code.from_asset('image'),
             handler = 'image.handler',
-            timeout = Duration.seconds(900),
+            timeout = Duration.seconds(30),
             architecture = _lambda.Architecture.ARM_64,
             environment = dict(
                 IMAGE_FUNCTION = '/snap4n6/task/image'
             ),
-            memory_size = 512,
+            memory_size = 128,
             role = role
         )
         
@@ -165,7 +165,7 @@ class Snap4N6Stack(Stack):
                 BUCKET_NAME = bucket.bucket_name,
                 IMAGE_FUNCTION = '/snap4n6/task/image'
             ),
-            memory_size = 512,
+            memory_size = 128,
             role = role
         )
         
