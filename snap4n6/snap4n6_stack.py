@@ -1,4 +1,7 @@
+import cdk_nag
+
 from aws_cdk import (
+    Aspects,
     Duration,
     RemovalPolicy,
     Stack,
@@ -239,3 +242,7 @@ class Snap4N6Stack(Stack):
             string_value = state.state_machine_arn,
             tier = _ssm.ParameterTier.STANDARD
         )
+
+### CDK NAG ###
+
+        #Aspects.of(self).add(cdk_nag.AwsSolutionsChecks())
