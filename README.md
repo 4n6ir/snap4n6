@@ -2,7 +2,6 @@
 
 
 
-
 ### Budget Event
 
 ```json
@@ -22,6 +21,8 @@ Volume Size: 	  1 GB
 
 ### Image Event
 
+Snap4n6 monitors the number of transitions allowing it to start a new step function execution to complete the snapshot forensic image.
+
 ```json
 {
   "SnapshotID": "snap-0f3e60199f11889da",
@@ -32,7 +33,7 @@ Volume Size: 	  1 GB
 
 ### Filename Schema
 
-Elastic Block Storage (EBS) Block Index Number has zeros padded to the left up to ten characters to help performance by using human ordering instead of mathematical, limiting disk thrashing during image rebuild.
+Elastic Block Storage (EBS) Block Index Number has zeros padded to the left up to ten characters to help performance by using human ordering instead of mathematical, limiting disk thrashing during image rebuild for offset calculations.
 
 ```
 0000000000_snap-0f3e60199f11889da_f14c4f4171a10625f16fe9c97369d06c144e4bfe06b96250c5d40c04ba212319_1_524288
