@@ -1,6 +1,6 @@
 # Snap4n6
 
-Simplify the process of imaging a Snapshot of an Elastic Block Storage (EBS) volume from an Elastic Compute Cloud (EC2) using Serverless technology.
+Simplify the process of imaging a Snapshot of an Elastic Block Storage (EBS) volume from an Elastic Compute Cloud (EC2) using only Serverless.
 
 ### Budget Event
 
@@ -23,7 +23,7 @@ Volume Size:      1 GB
 
 ### Image Event
 
-Snap4n6 monitors the number of transitions allowing it to start a new step function execution to complete the snapshot forensic image.
+Snap4n6 monitors the number of transitions allowing it to start a new step-function to complete the forensic image.
 
 ```json
 {
@@ -35,7 +35,7 @@ Snap4n6 monitors the number of transitions allowing it to start a new step funct
 
 ### Filename Schema
 
-EBS Block Index Number has zeros padded to the left up to ten characters to help performance by using human ordering instead of mathematical, limiting disk thrashing during image rebuild for offset calculations.
+EBS Block Index Number has zeros padded to the left up to ten characters to help performance by using human ordering instead of mathematical, limiting disk thrashing during image rebuild.
 
 ```
 0000000000_snap-0f3e60199f11889da_f14c4f4171a10625f16fe9c97369d06c144e4bfe06b96250c5d40c04ba212319_1_524288
