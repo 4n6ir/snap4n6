@@ -49,6 +49,6 @@ Elastic Block Storage (EBS) Block Index Number has zeros padded to the left up t
 5. EBS Block Size ( Default: 512.0 KB )
   - ```524288```
 
-### Step-Function
+### Step-Function Diagram
 
 ![Snap4n6 Step Function](SNAP4N6.jpg)
