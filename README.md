@@ -1,8 +1,10 @@
 # Snap4n6
 
-
+Simplify the process of imaging a Snapshot of an Elastic Block Storage (EBS) volume from an Elastic Compute Cloud (EC2) using Serverless technology.
 
 ### Budget Event
+
+Snap4n6 provides budget information for generating a cost estimate for the forensic image.
 
 ```json
 {
@@ -13,10 +15,10 @@
 ### Budget Response
 
 ```
-Snapshot ID: 	  snap-0f3e60199f11889da
-API Quantity: 	104
-Download Size: 	0.05 GB
-Volume Size: 	  1 GB
+Snapshot ID:      snap-0f3e60199f11889da
+API Quantity:     104
+Download Size:    0.05 GB
+Volume Size:      1 GB
 ```
 
 ### Image Event
@@ -33,7 +35,7 @@ Snap4n6 monitors the number of transitions allowing it to start a new step funct
 
 ### Filename Schema
 
-Elastic Block Storage (EBS) Block Index Number has zeros padded to the left up to ten characters to help performance by using human ordering instead of mathematical, limiting disk thrashing during image rebuild for offset calculations.
+EBS Block Index Number has zeros padded to the left up to ten characters to help performance by using human ordering instead of mathematical, limiting disk thrashing during image rebuild for offset calculations.
 
 ```
 0000000000_snap-0f3e60199f11889da_f14c4f4171a10625f16fe9c97369d06c144e4bfe06b96250c5d40c04ba212319_1_524288
