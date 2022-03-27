@@ -8,6 +8,7 @@ jobs:
     permissions:
       id-token: write
       contents: read
+      security-events: write
     steps:
       - name: Repository Checkout
         uses: actions/checkout@v2
