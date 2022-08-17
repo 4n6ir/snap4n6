@@ -1,14 +1,17 @@
-import cdk_nag
+import boto3
+import sys
 
 from aws_cdk import (
-    Aspects,
     Duration,
     RemovalPolicy,
     Stack,
     aws_iam as _iam,
     aws_lambda as _lambda,
     aws_logs as _logs,
+    aws_logs_destinations as _destinations,
     aws_s3 as _s3,
+    aws_sns as _sns,
+    aws_sns_subscriptions as _subs,
     aws_ssm as _ssm,
     aws_stepfunctions as _sfn,
     aws_stepfunctions_tasks as _tasks
@@ -20,6 +23,24 @@ class Snap4N6Stack(Stack):
 
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
+
+        try:
+            client = boto3.client('account')
+            operations = client.get_alternate_contact(
+                AlternateContactType='OPERATIONS'
+            )
+        except:
+            print('Missing IAM Permission --> account:GetAlternateContact')
+            sys.exit(1)
+            pass
+
+        operationstopic = _sns.Topic(
+            self, 'operationstopic'
+        )
+
+        operationstopic.add_subscription(
+            _subs.EmailSubscription(operations['AlternateContact']['EmailAddress'])
+        )
 
 ### BUCKET ###
 
@@ -48,7 +69,7 @@ class Snap4N6Stack(Stack):
                 'lambda.amazonaws.com'
             )
         )
-        
+
         role.add_managed_policy(
             _iam.ManagedPolicy.from_aws_managed_policy_name(
                 'service-role/AWSLambdaBasicExecutionRole'
@@ -68,6 +89,40 @@ class Snap4N6Stack(Stack):
             )
         )
 
+        role.add_to_policy(
+            _iam.PolicyStatement(
+                actions = [
+                    'sns:Publish'
+                ],
+                resources = [
+                    operationstopic.topic_arn
+                ]
+            )
+        )
+
+### ERROR ###
+
+        error = _lambda.Function(
+            self, 'error',
+            runtime = _lambda.Runtime.PYTHON_3_9,
+            code = _lambda.Code.from_asset('error'),
+            handler = 'error.handler',
+            role = role,
+            environment = dict(
+                SNS_TOPIC = operationstopic.topic_arn
+            ),
+            architecture = _lambda.Architecture.ARM_64,
+            timeout = Duration.seconds(3),
+            memory_size = 128
+        )
+
+        errormonitor = _logs.LogGroup(
+            self, 'errormonitor',
+            log_group_name = '/aws/lambda/'+error.function_name,
+            retention = _logs.RetentionDays.ONE_DAY,
+            removal_policy = RemovalPolicy.DESTROY
+        )
+
 ### BUDGET ###
 
         budget = _lambda.Function(
@@ -80,20 +135,26 @@ class Snap4N6Stack(Stack):
             memory_size = 128,
             role = role
         )
-        
+
         budgetlogs = _logs.LogGroup(
             self, 'budgetlogs',
             log_group_name = '/aws/lambda/'+budget.function_name,
             retention = _logs.RetentionDays.ONE_DAY,
             removal_policy = RemovalPolicy.DESTROY
         )
-        
-        budgetmonitor = _ssm.StringParameter(
-            self, 'budgetmonitor',
-            description = 'Snap4n6 Budget Monitor',
-            parameter_name = '/snap4n6/monitor/budget',
-            string_value = '/aws/lambda/'+budget.function_name,
-            tier = _ssm.ParameterTier.STANDARD
+
+        budgetsub = _logs.SubscriptionFilter(
+            self, 'budgetsub',
+            log_group = budgetlogs,
+            destination = _destinations.LambdaDestination(error),
+            filter_pattern = _logs.FilterPattern.all_terms('ERROR')
+        )
+
+        budgettime= _logs.SubscriptionFilter(
+            self, 'budgettime',
+            log_group = budgetlogs,
+            destination = _destinations.LambdaDestination(error),
+            filter_pattern = _logs.FilterPattern.all_terms('Task','timed','out')
         )
 
 ### PASSTHRU ###
@@ -108,20 +169,26 @@ class Snap4N6Stack(Stack):
             memory_size = 128,
             role = role
         )
-        
+
         passthrulogs = _logs.LogGroup(
             self, 'passthrulogs',
             log_group_name = '/aws/lambda/'+passthru.function_name,
             retention = _logs.RetentionDays.ONE_DAY,
             removal_policy = RemovalPolicy.DESTROY
         )
-        
-        passthrumonitor = _ssm.StringParameter(
-            self, 'passthrumonitor',
-            description = 'Snap4n6 PassThru Monitor',
-            parameter_name = '/snap4n6/monitor/passthru',
-            string_value = '/aws/lambda/'+passthru.function_name,
-            tier = _ssm.ParameterTier.STANDARD
+
+        passthrusub = _logs.SubscriptionFilter(
+            self, 'passthrusub',
+            log_group = passthrulogs,
+            destination = _destinations.LambdaDestination(error),
+            filter_pattern = _logs.FilterPattern.all_terms('ERROR')
+        )
+
+        passthrutime= _logs.SubscriptionFilter(
+            self, 'passthrutime',
+            log_group = passthrulogs,
+            destination = _destinations.LambdaDestination(error),
+            filter_pattern = _logs.FilterPattern.all_terms('Task','timed','out')
         )
 
 ### IMAGE ###
@@ -139,20 +206,26 @@ class Snap4N6Stack(Stack):
             memory_size = 128,
             role = role
         )
-        
+
         imagelogs = _logs.LogGroup(
             self, 'imagelogs',
             log_group_name = '/aws/lambda/'+image.function_name,
             retention = _logs.RetentionDays.ONE_DAY,
             removal_policy = RemovalPolicy.DESTROY
         )
-        
-        imagemonitor = _ssm.StringParameter(
-            self, 'imagemonitor',
-            description = 'Snap4n6 Image Monitor',
-            parameter_name = '/snap4n6/monitor/image',
-            string_value = '/aws/lambda/'+image.function_name,
-            tier = _ssm.ParameterTier.STANDARD
+
+        imagesub = _logs.SubscriptionFilter(
+            self, 'imagesub',
+            log_group = imagelogs,
+            destination = _destinations.LambdaDestination(error),
+            filter_pattern = _logs.FilterPattern.all_terms('ERROR')
+        )
+
+        imagetime= _logs.SubscriptionFilter(
+            self, 'imagetime',
+            log_group = imagelogs,
+            destination = _destinations.LambdaDestination(error),
+            filter_pattern = _logs.FilterPattern.all_terms('Task','timed','out')
         )
 
 ### IMAGER ###
@@ -171,20 +244,26 @@ class Snap4N6Stack(Stack):
             memory_size = 128,
             role = role
         )
-        
+
         imagerlogs = _logs.LogGroup(
             self, 'imagerlogs',
             log_group_name = '/aws/lambda/'+imager.function_name,
             retention = _logs.RetentionDays.ONE_DAY,
             removal_policy = RemovalPolicy.DESTROY
         )
-        
-        imagermonitor = _ssm.StringParameter(
-            self, 'imagermonitor',
-            description = 'Snap4n6 Imager Monitor',
-            parameter_name = '/snap4n6/monitor/imager',
-            string_value = '/aws/lambda/'+imager.function_name,
-            tier = _ssm.ParameterTier.STANDARD
+
+        imagersub = _logs.SubscriptionFilter(
+            self, 'imagersub',
+            log_group = imagerlogs,
+            destination = _destinations.LambdaDestination(error),
+            filter_pattern = _logs.FilterPattern.all_terms('ERROR')
+        )
+
+        imagertime= _logs.SubscriptionFilter(
+            self, 'imagertime',
+            log_group = imagerlogs,
+            destination = _destinations.LambdaDestination(error),
+            filter_pattern = _logs.FilterPattern.all_terms('Task','timed','out')
         )
 
 ### IMAGE FUNCTION ###
@@ -218,14 +297,14 @@ class Snap4N6Stack(Stack):
                 .when(_sfn.Condition.string_equals('$.status', 'SUCCEEDED'), succeed)
                 .otherwise(imaging)
             )
-            
+
         statelogs = _logs.LogGroup(
             self, 'statelogs',
             log_group_name = '/aws/state/snap4n6image',
             retention = _logs.RetentionDays.ONE_DAY,
             removal_policy = RemovalPolicy.DESTROY
         )
-            
+
         state = _sfn.StateMachine(
             self, 'snap4n6image',
             definition = definition,
@@ -242,7 +321,3 @@ class Snap4N6Stack(Stack):
             string_value = state.state_machine_arn,
             tier = _ssm.ParameterTier.STANDARD
         )
-
-### CDK NAG ###
-
-        #Aspects.of(self).add(cdk_nag.AwsSolutionsChecks())
