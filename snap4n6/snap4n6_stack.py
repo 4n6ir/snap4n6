@@ -112,7 +112,7 @@ class Snap4N6Stack(Stack):
                 SNS_TOPIC = operationstopic.topic_arn
             ),
             architecture = _lambda.Architecture.ARM_64,
-            timeout = Duration.seconds(3),
+            timeout = Duration.seconds(7),
             memory_size = 128
         )
 
@@ -303,6 +303,20 @@ class Snap4N6Stack(Stack):
             log_group_name = '/aws/state/snap4n6image',
             retention = _logs.RetentionDays.ONE_DAY,
             removal_policy = RemovalPolicy.DESTROY
+        )
+
+        statelogssub = _logs.SubscriptionFilter(
+            self, 'statelogssub',
+            log_group = statelogs,
+            destination = _destinations.LambdaDestination(error),
+            filter_pattern = _logs.FilterPattern.all_terms('ERROR')
+        )
+
+        statelogstime= _logs.SubscriptionFilter(
+            self, 'statelogstime',
+            log_group = statelogs,
+            destination = _destinations.LambdaDestination(error),
+            filter_pattern = _logs.FilterPattern.all_terms('Task','timed','out')
         )
 
         state = _sfn.StateMachine(
