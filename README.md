@@ -55,3 +55,7 @@ EBS Block Index Number has zeros padded to the left up to ten characters to help
 ### Step-Function Diagram
 
 ![Snap4n6 Step Function](SNAP4N6.jpg)
+
+### Alternative
+
+- coldsnap - https://github.com/awslabs/coldsnap
