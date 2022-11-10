@@ -18,6 +18,7 @@ Snap4N6Stack(
     )
 )
 
-cdk.Tags.of(app).add('snap4n6','snap4n6')
+cdk.Tags.of(app).add('Alias','Imager')
+cdk.Tags.of(app).add('GitHub','https://github.com/jblukach/snap4n6.git')
 
 app.synth()
